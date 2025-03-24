@@ -1,0 +1,4 @@
+reportlab==3.6.12
+factur-x==1.0.0
+pypdf==3.15.1
+pillow==9.5.0
