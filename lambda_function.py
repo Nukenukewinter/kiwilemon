@@ -12,8 +12,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import CMYKColor, Color
 
-# Import facturx
-from facturx import generate_from_binary
+# Updated import for facturx
+from facturx import generate_from_file
 
 # Set up logging
 logger = logging.getLogger()
@@ -266,16 +266,44 @@ def lambda_handler(event, context):
         
         logger.info("Successfully decoded base64 data")
         
-        # Use facturx to generate the initial Factur-X PDF
-        facturx_pdf = generate_from_binary(
-            pdf_binary,
-            xml_binary,
-            check_xsd=check_xsd,
-            flavor=flavor,
-            level=level
-        )
+        # MODIFICATION: Use generate_from_file instead of generate_from_binary
+        # Create temporary files for the PDF and XML
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
+            temp_pdf.write(pdf_binary)
+            temp_pdf_path = temp_pdf.name
         
-        logger.info("Successfully generated Factur-X PDF")
+        with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as temp_xml:
+            temp_xml.write(xml_binary)
+            temp_xml_path = temp_xml.name
+        
+        # Create a file for the output
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_output:
+            temp_output_path = temp_output.name
+        
+        try:
+            # Use generate_from_file with the temporary files
+            generate_from_file(
+                temp_pdf_path,
+                temp_xml_path,
+                output_pdf_file=temp_output_path,
+                check_xsd=check_xsd,
+                flavor=flavor,
+                level=level
+            )
+            
+            logger.info("Successfully generated Factur-X PDF")
+            
+            # Read the generated PDF file
+            with open(temp_output_path, 'rb') as f:
+                facturx_pdf = f.read()
+        
+        finally:
+            # Clean up temporary files
+            for path in [temp_pdf_path, temp_xml_path, temp_output_path]:
+                try:
+                    os.unlink(path)
+                except:
+                    pass
         
         # Enhance the PDF for better PDF/A-3 compliance
         enhanced_pdf = enhance_pdf_for_compliance(facturx_pdf)
